@@ -15,7 +15,7 @@ public class Demo {
 	    p.connect();
 
 	    int team_id = Integer.parseInt(args[0]);
-		String team_name = "haungzhiwei";
+		String team_name = "大白菜";
 		Client client = new Client(team_id, team_name);
 
 		/* registration */

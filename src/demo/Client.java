@@ -22,6 +22,8 @@ public class Client {
 	private List<Player> players = new ArrayList<Player>();
 	private List<Player> enemy_players=new ArrayList<>();
 	private List<Power> powers=new ArrayList<>();
+	private int width=0;
+	private int height=0;
 
 	public Client(int team_id, String team_name) {
 		this.team_id = team_id;
@@ -38,7 +40,9 @@ public class Client {
 		JSONObject map = data.getJSONObject("map");
 
 		int width = map.getInt("width");
+		this.width=width;
 		int height = map.getInt("height");
+		this.height=height;
 		int vision = map.getInt("vision");
 		System.out.printf("map width:%d, map height %d, map vision %d\n", width, height, vision);
 
@@ -180,27 +184,37 @@ public class Client {
 		int idx = getIdx();
 		for(Player player : this.players)
 		{
-			String action="up";
-			int grade=-9999;
-			int up_grade=getGradeByPlace(player.getX(),player.getY()-1);
-			int down_grade=getGradeByPlace(player.getX(),player.getY()+1);
-			int left_grade=getGradeByPlace(player.getX()-1,player.getY());
-			int right_grade=getGradeByPlace(player.getX()+1,player.getY());
-			if (up_grade>grade){
-				action="up";
-				grade=up_grade;
+			Random r = new Random();
+			int i=r.nextInt(3);
+			String action=moves.get(i);
+			int grade=0;
+			if (player.getY()-1>=0) {
+				int up_grade = getGradeByPlace(player.getX(), player.getY() - 1);
+				if (up_grade>grade){
+					action="up";
+					grade=up_grade;
+				}
 			}
-			if (down_grade>grade){
-				action="down";
-				grade=down_grade;
+			if (player.getY()+1<height) {
+				int down_grade = getGradeByPlace(player.getX(), player.getY() + 1);
+				if (down_grade>grade){
+					action="down";
+					grade=down_grade;
+				}
 			}
-			if (left_grade>grade){
-				action="left";
-				grade=left_grade;
+			if (player.getX()-1>=0) {
+				int left_grade = getGradeByPlace(player.getX() - 1, player.getY());
+				if (left_grade>grade){
+					action="left";
+					grade=left_grade;
+				}
 			}
-			if (right_grade>grade){
-				action="right";
-//				grade=right_grade;
+			if (player.getX()+1<width) {
+				int right_grade = getGradeByPlace(player.getX() + 1, player.getY());
+				if (right_grade > grade) {
+					action = "right";
+				grade=right_grade;
+				}
 			}
 //			System.out.printf(action);
 			actions.add(new Action(player.getTeam(), player.getId(), action));
@@ -222,16 +236,17 @@ public class Client {
 				}
 			}
 		}
-//		if (mode.equals("think")){
-//			//蓝鲲时需要躲避红鲲
-//			for (Player player:enemy_players){
-//				//遇见敌人
-//				if (Math.abs(x-player.getX())+Math.abs(y-player.getY())==0) {
-//					enemyGrade = -999;
-//				}
-//			}
-//		}
-		grade=-miniPowerGrade+enemyGrade;
+		int power_grade=(int)Math.pow(miniPowerGrade,-1);
+		if (mode.equals("think")){
+			//蓝鲲时需要躲避红鲲
+			for (Player player:enemy_players){
+				//遇见敌人
+				if (Math.abs(x-player.getX())+Math.abs(y-player.getY())==0) {
+					enemyGrade = -999;
+				}
+			}
+		}
+		grade=power_grade+enemyGrade;
 		return grade;
 	}
 
