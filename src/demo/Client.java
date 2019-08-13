@@ -22,6 +22,7 @@ public class Client {
 	private List<Player> players = new ArrayList<Player>();
 	private List<Player> enemy_players=new ArrayList<>();
 	private List<Power> powers=new ArrayList<>();
+	private List<Meteor> meteors = null;
 	private int width=0;
 	private int height=0;
 
@@ -47,11 +48,13 @@ public class Client {
 		System.out.printf("map width:%d, map height %d, map vision %d\n", width, height, vision);
 
 		try {
+			meteors.clear();
 			JSONArray meteorArray  = map.getJSONArray("meteor");
 			for (int i = 0; i < meteorArray.size(); i++) {
 				JSONObject object = meteorArray.getJSONObject(i);
 				Meteor meteor = new Meteor(object);
-			}			
+				this.meteors.add(meteor);
+			}
 		}
 		catch (Exception e) {
 			System.out.printf("donot get meteor");
@@ -188,35 +191,27 @@ public class Client {
 			int i=r.nextInt(3);
 			String action=moves.get(i);
 			int grade=0;
-			if (player.getY()-1>=0) {
-				int up_grade = getGradeByPlace(player.getX(), player.getY() - 1);
-				if (up_grade>grade){
-					action="up";
-					grade=up_grade;
-				}
+			int up_grade = getGradeByPlace(player.getX(), player.getY() - 1);
+			int down_grade = getGradeByPlace(player.getX(), player.getY() + 1);
+			int left_grade = getGradeByPlace(player.getX() - 1, player.getY());
+			int right_grade = getGradeByPlace(player.getX() + 1, player.getY());
+			if (up_grade>grade){
+				action="up";
+				grade=up_grade;
 			}
-			if (player.getY()+1<height) {
-				int down_grade = getGradeByPlace(player.getX(), player.getY() + 1);
-				if (down_grade>grade){
-					action="down";
-					grade=down_grade;
-				}
+
+			if (down_grade>grade){
+				action="down";
+				grade=down_grade;
 			}
-			if (player.getX()-1>=0) {
-				int left_grade = getGradeByPlace(player.getX() - 1, player.getY());
-				if (left_grade>grade){
-					action="left";
-					grade=left_grade;
-				}
+
+			if (left_grade>grade){
+				action="left";
+				grade=left_grade;
 			}
-			if (player.getX()+1<width) {
-				int right_grade = getGradeByPlace(player.getX() + 1, player.getY());
-				if (right_grade > grade) {
-					action = "right";
-				grade=right_grade;
-				}
+			if (right_grade > grade) {
+				action = "right";
 			}
-//			System.out.printf(action);
 			actions.add(new Action(player.getTeam(), player.getId(), action));
 		}
 		
@@ -228,7 +223,20 @@ public class Client {
 		int grade=0;
 		int miniPowerGrade=99;
 		int enemyGrade=0;
+		int meteorGrade=0;
+		int borderGrade=0;
+		for (Meteor meteor:meteors){
+			//遇到陨石
+			if (x==meteor.getX() && y==meteor.getY()){
+				meteorGrade=-9999;
+			}
+		}
+		if (x<0 || x>=width ||y<0 || y>=height){
+			//遇到边界
+			borderGrade=-9999;
+		}
 		if(powers!=null&& powers.size()!=0) {
+		//计算最近的得分点
 			for (Power power : powers) {
 				int powerGrade = Math.abs(power.getX() - x) + Math.abs(power.getY() - y);
 				if (powerGrade < miniPowerGrade) {
@@ -236,7 +244,9 @@ public class Client {
 				}
 			}
 		}
-		int power_grade=(int)Math.pow(miniPowerGrade,-1);
+		int power_grade=miniPowerGrade*-1+100;
+
+
 		if (mode.equals("think")){
 			//蓝鲲时需要躲避红鲲
 			for (Player player:enemy_players){
@@ -246,7 +256,7 @@ public class Client {
 				}
 			}
 		}
-		grade=power_grade+enemyGrade;
+		grade=power_grade+enemyGrade+meteorGrade+borderGrade;
 		return grade;
 	}
 
