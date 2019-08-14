@@ -26,6 +26,7 @@ public class Client {
 	private List<Meteor> meteors = null;
 	private int width=0;
 	private int height=0;
+	private List<oldMap> oldMaps = new ArrayList<oldMap>();
 	private Map<Integer,String> actions_old = new HashMap<>();
 	private Map<Integer,Integer> xy_old = new HashMap<>();
 
