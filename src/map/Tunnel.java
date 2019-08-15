@@ -14,4 +14,15 @@ public class Tunnel {
 		
 	}
 
+	public int getX() {
+		return x;
+	}
+
+	public int getY() {
+		return y;
+	}
+
+	public String getDirection() {
+		return direction;
+	}
 }

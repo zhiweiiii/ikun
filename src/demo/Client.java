@@ -5,9 +5,7 @@ import net.sf.json.JSONObject;
 import map.*;
 
 import java.util.*;
-import java.util.stream.Collectors;
 
-import demo.Team;
 import cmd.Action;
 import cmd.RoundAction;
 
@@ -23,10 +21,12 @@ public class Client {
 	private List<Player> players = new ArrayList<Player>();
 	private List<Player> enemy_players=new ArrayList<>();
 	private List<Power> powers=new ArrayList<>();
-	private List<Meteor> meteors = null;
+	private List<Meteor> meteors = new ArrayList<>();
+	private List<Tunnel> tunnels=new ArrayList<>();
 	private int width=0;
 	private int height=0;
-	private List<oldMap> oldMaps = new ArrayList<oldMap>();
+	private int vision=0;
+	private List<OldMap> oldMaps = new ArrayList<OldMap>();
 	private Map<Integer,String> actions_old = new HashMap<>();
 	private Map<Integer,Integer> xy_old = new HashMap<>();
 
@@ -49,6 +49,7 @@ public class Client {
 		int height = map.getInt("height");
 		this.height=height;
 		int vision = map.getInt("vision");
+		this.vision=vision;
 		System.out.printf("map width:%d, map height %d, map vision %d\n", width, height, vision);
 
 		try {
@@ -63,31 +64,34 @@ public class Client {
 		catch (Exception e) {
 			System.out.printf("donot get meteor");
 		}
-		
-		
+
+
+
 		try {
-		JSONArray cloudArray = map.getJSONArray("cloud");
-		for (int i = 0; i < cloudArray.size(); i++) {
-			JSONObject object = cloudArray.getJSONObject(i);
-			Cloud cloud = new Cloud(object);
-		}
+			JSONArray cloudArray = map.getJSONArray("cloud");
+			for (int i = 0; i < cloudArray.size(); i++) {
+				JSONObject object = cloudArray.getJSONObject(i);
+				Cloud cloud = new Cloud(object);
+			}
 		}
 		catch (Exception e) {
 			System.out.printf("donot get cloud");
 		}
-		
-		try {		
+
+		try {
+            tunnels.clear();
 			JSONArray tunnelArray = map.getJSONArray("tunnel");
 			for (int i = 0; i < tunnelArray.size(); i++) {
 				JSONObject object = tunnelArray.getJSONObject(i);
 				Tunnel tunnel = new Tunnel(object);
+				this.tunnels.add(tunnel);
 			}
 		}
 		catch (Exception e) {
 			System.out.printf("donot get tunnel");
 		}
-		
-		try {		
+
+		try {
 			JSONArray wormholeArray = map.getJSONArray("wormhole");
 			for (int i = 0; i < wormholeArray.size(); i++) {
 				JSONObject object = wormholeArray.getJSONObject(i);
@@ -98,9 +102,9 @@ public class Client {
 			System.out.printf("donot get wormhole");
 		}
 
-		try {		
+		try {
 			JSONArray teams = data.getJSONArray("teams");
-	
+
 			for (int i = 0; i < 2; i++) {
 				JSONObject team = teams.getJSONObject(i);
 				int team_id = team.getInt("id");
@@ -134,6 +138,17 @@ public class Client {
 
 	public void round(JSONObject data) {
 		this.roundId = data.getInt("round_id");
+		if (roundId%30==0){
+			for (int i=0;i<width;i++){
+				OldMap oldMap=new OldMap();
+				boolean[] y_height=new boolean[height];
+				for(int j=0;j<height;j++){
+					y_height[j]=false;
+				}
+				oldMap.setY_map(y_height);
+				oldMaps.add(oldMap);
+			}
+		}
 		this.mode = data.getString("mode");
 		System.out.printf("round %d, mode %s\n", this.roundId, this.mode);
 
@@ -183,7 +198,7 @@ public class Client {
 	{
 		int idx = moveIdx % 4;
 		moveIdx ++;
-		
+
 		return idx;
 	}
 	public RoundAction act() {
@@ -191,12 +206,12 @@ public class Client {
 		int idx = getIdx();
 		for(Player player : this.players)
 		{
-			String action="up";
-			double grade=0;
-			double up_grade = getGradeByPlace(player.getX(), player.getY() - 1,"up");
-			double down_grade = getGradeByPlace(player.getX(), player.getY() + 1,"down");
-			double left_grade = getGradeByPlace(player.getX() - 1, player.getY(),"left");
-			double right_grade = getGradeByPlace(player.getX() + 1, player.getY(),"right");
+			String action="left";
+			double grade=-999;
+			double up_grade = getGradeByPlace(player.getX(), player.getY() - 1,"up",player);
+			double down_grade = getGradeByPlace(player.getX(), player.getY() + 1,"down",player);
+			double left_grade = getGradeByPlace(player.getX() - 1, player.getY(),"left",player);
+			double right_grade = getGradeByPlace(player.getX() + 1, player.getY(),"right",player);
 			if (up_grade>grade){
 				action="up";
 				grade=up_grade;
@@ -213,75 +228,78 @@ public class Client {
 				action = "right";
 				grade = right_grade;
 			}
-//			if (actions_old.get(player.getId())!=null){
-//
-//			}
 			actions.add(new Action(player.getTeam(), player.getId(), action));
-//			actions_old.put(player.getId(),action);
-//			xy_old.put(player.getId(),player.getX()*1000+player.getY());
+			//增加已探索区域
+			for(int i=-this.vision;i<=this.vision;i++){
+				for (int j=-this.vision;j<=this.vision;j++){
+					if (player.getX()+i>=0 && player.getX()+i<width && player.getY()+j>=0 && player.getY()+j<height) {
+						oldMaps.get(player.getX() + i).getY_map()[player.getY() + j] = true;
+					}
+				}
+			}
 		}
 		RoundAction roundAction = new RoundAction(this.roundId, actions);
 		return roundAction;
 	}
 
-//	private String getBestWay(int x,int y){
-//		int left=Math.abs(x-1-width)+Math.abs(y-height);
-//		int right=Math.abs(x+1-width)+Math.abs(y-height);
-//		int up=Math.abs(x-width)+Math.abs(y-1-height);
-//		int down=Math.abs(x-width)+Math.abs(y+1-height);
-//		int[] arr=new int[] {left,right,up,down};
-//		String[] Index=new String[]{"left","right","up","down"};
-//		for(int i=0;i<arr.length;i++)
-//		{
-//			for(int j=0;j<arr.length-i-1;j++)
-//			{
-//				if(arr[j]<arr[j+1])
-//				{
-//					int temp = arr[j];
-//					arr[j] = arr[j+1];
-//					arr[j+1] = temp;
-//
-//					String index=Index[j];
-//					Index[j] = Index[j+1];
-//					Index[j+1] = index;
-//				}
-//			}
-//		}
-//
-//        return Index[0];
-//	}
 
-	private Boolean notBorder(int x,int y){
-		if (meteors!=null &&meteors.size()!=0) {
-			//遇到陨石
-			for (Meteor meteor : meteors) {
-				if (x == meteor.getX() && y == meteor.getY()) {
-					return false;
-				}
-			}
-		}
+	private Boolean notBorder(int x,int y,String action){
+	    if(meteors!=null && meteors.size()!=0) {
+            //遇到陨石
+            for (Meteor meteor : meteors) {
+                if (x == meteor.getX() && y == meteor.getY()) {
+                    return false;
+                }
+            }
+        }
 		if (x<0 || x>=width ||y<0 || y>=height){
 			//遇到边界
 			return false;
 		}
+        if (tunnels!=null && tunnels.size()!=0) {
+            //反向进入时空隧道
+            for (Tunnel tunnel:tunnels){
+                if (tunnel.getX()==x && tunnel.getY()==y){
+                    if ((tunnel.getDirection().equals("down") && action.equals("up")) || (tunnel.getDirection().equals("up") && action.equals("down"))|| (tunnel.getDirection().equals("left") && action.equals("right"))|| (tunnel.getDirection().equals("right") && action.equals("left"))){
+                        return false;
+                    }
+                }
+            }
+
+        }
 		return true;
 	}
 
-	private double getGradeByPlace(int x,int y,String action){
+	private double getGradeByPlace(int x,int y,String action,Player main_player){
 		double grade=0;
 		double miniPowerGrade=100;
 		double power_grade=0;
 		double enemyGrade=0;
 		if(powers!=null&& powers.size()!=0) {
-		//计算最近的得分点
+			//计算最近的得分点
 			for (Power power : powers) {
 				int powerGrade = Math.abs(power.getX() - x) + Math.abs(power.getY() - y);
 				if (powerGrade < miniPowerGrade) {
 					miniPowerGrade = powerGrade;
 				}
 			}
-            power_grade=Math.pow(miniPowerGrade,-1);
+			power_grade=100*Math.pow(miniPowerGrade,-1);
 		}
+		//遇到同伴分散开来
+		double mini_play_dist=100;
+		for (Player player_2 : players) {
+			if(main_player.getId()!=player_2.getId()) {
+				int play_dist = Math.abs(x - player_2.getX()) + Math.abs(y - player_2.getY());
+				if (play_dist < mini_play_dist) {
+					mini_play_dist = play_dist;
+				}
+				if(player_2.getX()==main_player.getX() && player_2.getY()==main_player.getY()){
+					Random random=new Random();
+					mini_play_dist=random.nextInt(5);
+				}
+			}
+		}
+		double playDistGrade=101*Math.pow(mini_play_dist,-1)*-1;
 
 		if (!mode.equals(self.getForce())) {
 			//处于劣势方时避让
@@ -293,7 +311,7 @@ public class Client {
 					mini_dist = enemy_dist;
 				}
 			}
-			enemyGrade = Math.pow(mini_dist,-1)*-1;
+			enemyGrade = 130*Math.pow(mini_dist,-1)*-1;
 		}
 		else{
 			//处于优势方时主动出击
@@ -304,28 +322,26 @@ public class Client {
 					mini_dist=enemy_dist;
 				}
 			}
-			enemyGrade= Math.pow(mini_dist,-1)*1;
+			enemyGrade= 130 * Math.pow(mini_dist,-1)*1;
 		}
-
-
-		grade=power_grade+enemyGrade;
+		//未探索的区域得分
+		double unsee_dist=0;
+		for (int i=0;i<width;i++){
+			OldMap y_height=oldMaps.get(i);
+			for(int j=0;j<height;j++){
+				if(!y_height.getY_map()[j]){
+					//未探索的区域
+					unsee_dist+=Math.abs(x-i)+Math.abs(y-j);
+				}
+			}
+		}
+		double unseeGrade=unsee_dist*-0.01;
+		grade=power_grade+enemyGrade+unseeGrade+playDistGrade;
+		//随机因子
 		Random random=new Random();
-//		if (action=="up" && y<height/3) {
-//			grade += random.nextInt(3);
-//		}
-//		else if (action=="down" && y>(2*height)/3) {
-//			grade += random.nextInt(3);
-//		}
-//		else if (action=="left" && x<width/3) {
-//			grade += random.nextInt(3);
-//		}
-//		else if (action=="right" && x>(2*width)/3) {
-//			grade += random.nextInt(3);
-//		}else{
-		grade+=Math.pow(random.nextInt(20),-1);
-//		}
-		if (!notBorder(x,y)){
-			grade=-99999;
+//		grade+=Math.pow(random.nextInt(20),-1);
+		if (!notBorder(x,y,action)){
+			grade=-9999;
 		}
 		return grade;
 	}
